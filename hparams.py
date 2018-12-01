@@ -5,7 +5,7 @@ import tensorflow as tf
 hparams = tf.contrib.training.HParams(
 	# Comma-separated list of cleaners to run on text prior to training and eval. For non-English
 	# text, you may want to use "basic_cleaners" or "transliteration_cleaners".
-	cleaners='english_cleaners',
+	cleaners='basic_cleaners',
 
 
 	#If you only have 1 GPU or want to use only one GPU, please set num_gpus=0 and specify the GPU idx on run. example:
@@ -15,7 +15,7 @@ hparams = tf.contrib.training.HParams(
 	#The hparams arguments can be directly modified on this hparams.py file instead of being specified on run if preferred!
 
 	#If one wants to train both Tacotron and WaveNet in parallel (provided WaveNet will be trained on True mel spectrograms), one needs to specify different GPU idxes.
-	#example Tacotron+WaveNet on a machine with 4 or plus GPUs. Two GPUs for each model: 
+	#example Tacotron+WaveNet on a machine with 4 or plus GPUs. Two GPUs for each model:
 		# CUDA_VISIBLE_DEVICES=0,1 python train.py --model='Tacotron' --hparams='tacotron_gpu_start_idx=0, tacotron_num_gpus=2'
 		# Cuda_VISIBLE_DEVICES=2,3 python train.py --model='WaveNet' --hparams='wavenet_gpu_start_idx=2; wavenet_num_gpus=2'
 
@@ -54,7 +54,7 @@ hparams = tf.contrib.training.HParams(
 	#		b- num_freq = (n_fft / 2) + 1. For the tuto example: num_freq = 2048 / 2 + 1 = 1024 + 1 = 1025.
 	#		c- For WaveNet, upsample_scales products must be equal to hop_size. For the tuto example: upsample_scales=[15, 20] where 15 * 20 = 300
 	#			it is also possible to use upsample_scales=[3, 4, 5, 5] instead. One must only keep in mind that upsample_kernel_size[0] = 2*upsample_scales[0]
-	#			so the training segments should be long enough (2.8~3x upsample_scales[0] * hop_size or longer) so that the first kernel size can see the middle 
+	#			so the training segments should be long enough (2.8~3x upsample_scales[0] * hop_size or longer) so that the first kernel size can see the middle
 	#			of the samples efficiently. The length of WaveNet training segments is under the parameter "max_time_steps".
 	#	5- Finally comes the silence trimming. This very much data dependent, so I suggest trying preprocessing (or part of it, ctrl-C to stop), then use the
 	#		.ipynb provided in the repo to listen to some inverted mel/linear spectrograms. That will first give you some idea about your above parameters, and
@@ -83,7 +83,7 @@ hparams = tf.contrib.training.HParams(
 	frame_shift_ms = None, #Can replace hop_size parameter. (Recommended: 12.5)
 
 	#M-AILABS (and other datasets) trim params (there parameters are usually correct for any data, but definitely must be tuned for specific speakers)
-	trim_fft_size = 512, 
+	trim_fft_size = 512,
 	trim_hop_size = 128,
 	trim_top_db = 23,
 
@@ -91,7 +91,7 @@ hparams = tf.contrib.training.HParams(
 	signal_normalization = True, #Whether to normalize mel spectrograms to some predefined range (following below parameters)
 	allow_clipping_in_normalization = True, #Only relevant if mel_normalization = True
 	symmetric_mels = True, #Whether to scale the data to be symmetric around 0. (Also multiplies the output range by 2, faster and cleaner convergence)
-	max_abs_value = 4., #max absolute value of data. If symmetric, data will be [-max, max] else [0, max] (Must not be too big to avoid gradient explosion, 
+	max_abs_value = 4., #max absolute value of data. If symmetric, data will be [-max, max] else [0, max] (Must not be too big to avoid gradient explosion,
 																										  #not too small for fast convergence)
 	normalize_for_wavenet = True, #whether to rescale to [0, 1] for wavenet. (better audio quality)
 	clip_for_wavenet = True, #whether to clip [-max, max] before training/synthesizing with wavenet (better audio quality)
@@ -113,7 +113,7 @@ hparams = tf.contrib.training.HParams(
 	###########################################################################################################################################
 
 	#Tacotron
-	outputs_per_step = 1, #number of frames to generate at each decoding step (increase to speed up computation and allows for higher batch size, decreases G&L audio quality)
+	outputs_per_step = 2, #number of frames to generate at each decoding step (increase to speed up computation and allows for higher batch size, decreases G&L audio quality)
 	stop_at_any = True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them (True works pretty well)
 
 	embedding_dim = 512, #dimension of embedding space
@@ -218,7 +218,7 @@ hparams = tf.contrib.training.HParams(
 
 	#train/test split ratios, mini-batches sizes
 	tacotron_batch_size = 32, #number of training samples on each training steps
-	#Tacotron Batch synthesis supports ~16x the training batch size (no gradients during testing). 
+	#Tacotron Batch synthesis supports ~16x the training batch size (no gradients during testing).
 	#Training Tacotron with unmasked paddings makes it aware of them, which makes synthesis times different from training. We thus recommend masking the encoder.
 	tacotron_synthesis_batch_size = 1, #DO NOT MAKE THIS BIGGER THAN 1 IF YOU DIDN'T TRAIN TACOTRON WITH "mask_encoder=True"!!
 	tacotron_test_size = 0.05, #% of data to keep as test data, if None, tacotron_test_batches must be not None. (5% is enough to have a good idea about overfit)
@@ -302,28 +302,16 @@ hparams = tf.contrib.training.HParams(
 
 	#Eval sentences (if no eval text file was specified during synthesis, these sentences are used for eval)
 	sentences = [
-	# From July 8, 2017 New York Times:
-	'Scientists at the CERN laboratory say they have discovered a new particle.',
-	'There\'s a way to measure the acute emotional intelligence that has never gone out of style.',
-	'President Trump met with other leaders at the Group of 20 conference.',
-	'The Senate\'s bill to repeal and replace the Affordable Care Act is now imperiled.',
-	# From Google's Tacotron example page:
-	'Generative adversarial network or variational auto-encoder.',
-	'Basilar membrane and otolaryngology are not auto-correlations.',
-	'He has read the whole thing.',
-	'He reads books.',
-	'He thought it was time to present the present.',
-	'Thisss isrealy awhsome.',
-	'Punctuation sensitivity, is working.',
-	'Punctuation sensitivity is working.',
-	"Peter Piper picked a peck of pickled peppers. How many pickled peppers did Peter Piper pick?",
-	"She sells sea-shells on the sea-shore. The shells she sells are sea-shells I'm sure.",
-	"Tajima Airport serves Toyooka.",
-	#From The web (random long utterance)
-	'Sequence to sequence models have enjoyed great success in a variety of tasks such as machine translation, speech recognition, and text summarization.\
-	This project covers a sequence to sequence model trained to predict a speech representation from an input sequence of characters. We show that\
-	the adopted architecture is able to perform this task with wild success.',
-	'Thank you so much for your support!',
+	        "Нийслэлийн прокурорын газраас төрийн өндөр албан тушаалтнуудад холбогдох зарим эрүүгийн хэргүүдийг шүүхэд шилжүүлэв.",
+        "Мөнх тэнгэрийн хүчин дор Монгол Улс цэцэглэн хөгжих болтугай.",
+        "Унасан хүлгээ түрүү магнай, аман хүзүүнд уралдуулж, айрагдуулсан унаач хүүхдүүдэд бэлэг гардууллаа.",
+        "Албан ёсоор хэлэхэд “Монгол Улсын хэрэг эрхлэх газрын гэгээнтэн” гэж нэрлээд байгаа зүйл огт байхгүй.",
+        "Сайн чанарын бохирын хоолой зарна.",
+        "Хараа тэглэх мэс заслын дараа хараа дахин муудах магадлал бага.",
+        "Ер нь бол хараа тэглэх мэс заслыг гоо сайхны мэс засалтай адилхан гэж зүйрлэж болно.",
+        "Хашлага даван, зүлэг гэмтээсэн жолоочийн эрхийг хоёр жилээр хасжээ.",
+        "Монгол хүн бидний сэтгэлийг сорсон орон. Энэ бол миний төрсөн нутаг. Монголын сайхан орон.",
+        "Постройка крейсера затягивалась из-за проектных неувязок, необходимости."
 	]
 
 	)
