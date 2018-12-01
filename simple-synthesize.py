@@ -1,15 +1,15 @@
 """ESpeak like synthesize to be used with aeneas."""
 import argparse
 import os
-from warnings import warn
-from time import sleep
+import time
 
 import tensorflow as tf
 
 from hparams import hparams
 from infolog import log
-from tacotron.synthesize import tacotron_synthesize
-from wavenet_vocoder.synthesize import wavenet_synthesize
+
+from tacotron.synthesizer import Synthesizer
+from tqdm import tqdm
 
 
 def prepare_run(args):
@@ -23,6 +23,7 @@ def prepare_run(args):
 	wave_checkpoint = os.path.join('logs-' + run_name, 'wave_' + args.checkpoint)
 	return taco_checkpoint, wave_checkpoint, modified_hp
 
+
 def get_sentences(args):
 	if args.text_list != '':
 		sentences = args.text_list.splitlines()
@@ -32,17 +33,57 @@ def get_sentences(args):
 		sentences = hparams.sentences
 	return sentences
 
-def synthesize(args, hparams, taco_checkpoint, wave_checkpoint, sentences):
-	log('Running End-to-End TTS Evaluation. Model: {}'.format(args.name or args.model))
-	log('Synthesizing mel-spectrograms from text..')
-	wavenet_in_dir = tacotron_synthesize(args, hparams, taco_checkpoint, sentences)
-	#Delete Tacotron model from graph
-	tf.reset_default_graph()
-	#Sleep 1/2 second to let previous graph close and avoid error messages while Wavenet is synthesizing
-	sleep(0.5)
-	log('Synthesizing audio from mel-spectrograms.. (This may take a while)')
-	wavenet_synthesize(args, hparams, wave_checkpoint)
-	log('Tacotron-2 TTS synthesis complete!')
+
+def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
+	eval_dir = os.path.join(output_dir, 'eval')
+	log_dir = os.path.join(output_dir, 'logs-eval')
+
+	if args.model == 'Tacotron-2':
+		assert os.path.normpath(eval_dir) == os.path.normpath(args.mels_dir)
+
+	#Create output path if it doesn't exist
+	os.makedirs(eval_dir, exist_ok=True)
+	os.makedirs(log_dir, exist_ok=True)
+	os.makedirs(os.path.join(log_dir, 'wavs'), exist_ok=True)
+	os.makedirs(os.path.join(log_dir, 'plots'), exist_ok=True)
+
+	synth = Synthesizer()
+	synth.load(checkpoint_path, hparams)
+
+	#Set inputs batch wise
+	sentences = [sentences[i: i+hparams.tacotron_synthesis_batch_size] for i in range(0, len(sentences), hparams.tacotron_synthesis_batch_size)]
+
+	#log('Starting Synthesis')
+	with open(os.path.join(eval_dir, 'map.txt'), 'w') as file:
+		for i, texts in enumerate(tqdm(sentences)):
+			start = time.time()
+			basenames = ['batch_{}_sentence_{}'.format(i, j) for j in range(len(texts))]
+			mel_filenames, speaker_ids = synth.synthesize(texts, basenames, eval_dir, log_dir, None)
+
+			for elems in zip(texts, mel_filenames, speaker_ids):
+				file.write('|'.join([str(x) for x in elems]) + '\n')
+	#log('synthesized mel spectrograms at {}'.format(eval_dir))
+	return eval_dir
+
+
+def tacotron_synthesize(args, hparams, checkpoint, sentences=None):
+	output_dir = 'tacotron_' + args.output_dir
+
+	try:
+		checkpoint_path = tf.train.get_checkpoint_state(checkpoint).model_checkpoint_path
+		log('loaded model at {}'.format(checkpoint_path))
+	except:
+		raise RuntimeError('Failed to load checkpoint at {}'.format(checkpoint))
+
+	if hparams.tacotron_synthesis_batch_size < hparams.tacotron_num_gpus:
+		raise ValueError('Defined synthesis batch size {} is smaller than minimum required {} (num_gpus)! Please verify your synthesis batch size choice.'.format(
+			hparams.tacotron_synthesis_batch_size, hparams.tacotron_num_gpus))
+
+	if hparams.tacotron_synthesis_batch_size % hparams.tacotron_num_gpus != 0:
+		raise ValueError('Defined synthesis batch size {} is not a multiple of {} (num_gpus)! Please verify your synthesis batch size choice!'.format(
+			hparams.tacotron_synthesis_batch_size, hparams.tacotron_num_gpus))
+
+	return run_eval(args, checkpoint_path, output_dir, hparams, sentences)
 
 
 
@@ -68,8 +109,7 @@ def main():
 	taco_checkpoint, wave_checkpoint, hparams = prepare_run(args)
 	sentences = get_sentences(args)
 
-	print(sentences)
-	#_ = tacotron_synthesize(args, hparams, taco_checkpoint, sentences)
+	_ = tacotron_synthesize(args, hparams, taco_checkpoint, sentences)
 
 
 if __name__ == '__main__':
