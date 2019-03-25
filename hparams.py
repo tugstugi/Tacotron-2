@@ -33,7 +33,7 @@ hparams = tf.contrib.training.HParams(
 	#Hardware setup: Default supposes user has only one GPU: "/gpu:0" (Tacotron only for now! WaveNet does not support multi GPU yet, WIP)
 	#Synthesis also uses the following hardware parameters for multi-GPU parallel synthesis.
     tacotron_gpu_start_idx = 0, #idx of the first GPU to be used for Tacotron training.
-    tacotron_num_gpus = 2, #Determines the number of gpus in use for Tacotron training.
+    tacotron_num_gpus = 1, #Determines the number of gpus in use for Tacotron training.
     wavenet_gpu_start_idx = 0, #idx of the first GPU to be used for WaveNet training. (WIP)
     wavenet_num_gpus = 1, #Determines the number of gpus in use for WaveNet training. (WIP)
     split_on_cpu = True, #Determines whether to split data on CPU or on first GPU. This is automatically True when more than 1 GPU is used.
@@ -67,7 +67,7 @@ hparams = tf.contrib.training.HParams(
 	trim_silence = True, #Whether to clip silence in Audio (at beginning and end of audio only, not the middle)
 	#train samples of lengths between 3sec and 14sec are more than enough to make a model capable of good parallelization.
 	clip_mels_length = True, #For cases of OOM (Not really recommended, only use if facing unsolvable OOM errors, also consider clipping your samples to smaller chunks)
-	max_mel_frames = 1000,  #Only relevant when clip_mels_length = True, please only use after trying output_per_steps=3 and still getting OOM errors.
+	max_mel_frames = 1200,  #Only relevant when clip_mels_length = True, please only use after trying output_per_steps=3 and still getting OOM errors.
 
 	# Use LWS (https://github.com/Jonathan-LeRoux/lws) for STFT and phase reconstruction
 	# It's preferred to set True to use with https://github.com/r9y9/wavenet_vocoder
@@ -113,7 +113,7 @@ hparams = tf.contrib.training.HParams(
 	###########################################################################################################################################
 
 	#Tacotron
-	outputs_per_step = 1, #number of frames to generate at each decoding step (increase to speed up computation and allows for higher batch size, decreases G&L audio quality)
+	outputs_per_step = 2, #number of frames to generate at each decoding step (increase to speed up computation and allows for higher batch size, decreases G&L audio quality)
 	stop_at_any = True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them (True works pretty well)
 
 	embedding_dim = 512, #dimension of embedding space
@@ -217,7 +217,7 @@ hparams = tf.contrib.training.HParams(
 	tacotron_swap_with_cpu = False, #Whether to use cpu as support to gpu for decoder computation (Not recommended: may cause major slowdowns! Only use when critical!)
 
 	#train/test split ratios, mini-batches sizes
-	tacotron_batch_size = 52, #number of training samples on each training steps
+	tacotron_batch_size = 64, #number of training samples on each training steps
 	#Tacotron Batch synthesis supports ~16x the training batch size (no gradients during testing).
 	#Training Tacotron with unmasked paddings makes it aware of them, which makes synthesis times different from training. We thus recommend masking the encoder.
 	tacotron_synthesis_batch_size = 1, #DO NOT MAKE THIS BIGGER THAN 1 IF YOU DIDN'T TRAIN TACOTRON WITH "mask_encoder=True"!!
