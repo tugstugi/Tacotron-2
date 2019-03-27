@@ -33,7 +33,7 @@ hparams = tf.contrib.training.HParams(
 	#Hardware setup: Default supposes user has only one GPU: "/gpu:0" (Tacotron only for now! WaveNet does not support multi GPU yet, WIP)
 	#Synthesis also uses the following hardware parameters for multi-GPU parallel synthesis.
     tacotron_gpu_start_idx = 0, #idx of the first GPU to be used for Tacotron training.
-    tacotron_num_gpus = 1, #Determines the number of gpus in use for Tacotron training.
+    tacotron_num_gpus = 2, #Determines the number of gpus in use for Tacotron training.
     wavenet_gpu_start_idx = 0, #idx of the first GPU to be used for WaveNet training. (WIP)
     wavenet_num_gpus = 1, #Determines the number of gpus in use for WaveNet training. (WIP)
     split_on_cpu = True, #Determines whether to split data on CPU or on first GPU. This is automatically True when more than 1 GPU is used.
@@ -98,14 +98,14 @@ hparams = tf.contrib.training.HParams(
 
 	#Contribution by @begeekmyfriend
 	#Spectrogram Pre-Emphasis (Lfilter: Reduce spectrogram noise and helps model certitude levels. Also allows for better G&L phase reconstruction)
-	preemphasize = True, #whether to apply filter
+	preemphasize = False, #whether to apply filter
 	preemphasis = 0.97, #filter coefficient.
 
 	#Limits
 	min_level_db = -100,
 	ref_level_db = 20,
-	fmin = 55, #Set this to 55 if your speaker is male! if female, 95 should help taking off noise. (To test depending on dataset. Pitch info: male~[65, 260], female~[100, 525])
-	fmax = 7600, #To be increased/reduced depending on data.
+	fmin = 0, #Set this to 55 if your speaker is male! if female, 95 should help taking off noise. (To test depending on dataset. Pitch info: male~[65, 260], female~[100, 525])
+	fmax = 8000, #To be increased/reduced depending on data.
 
 	#Griffin Lim
 	power = 1.5, #Only used in G&L inversion, usually values between 1.2 and 1.5 are a good choice.
@@ -156,7 +156,7 @@ hparams = tf.contrib.training.HParams(
 	mask_encoder = True, #whether to mask encoder padding while computing attention. Set to True for better prosody but slower convergence.
 	mask_decoder = False, #Whether to use loss mask for padded sequences (if False, <stop_token> loss function will not be weighted, else recommended pos_weight = 20)
 	cross_entropy_pos_weight = 20, #Use class weights to reduce the stop token classes imbalance (by adding more penalty on False Negatives (FN)) (1 = disabled)
-	predict_linear = True, #Whether to add a post-processing network to the Tacotron to predict linear spectrograms (True mode Not tested!!)
+	predict_linear = False, #Whether to add a post-processing network to the Tacotron to predict linear spectrograms (True mode Not tested!!)
 	###########################################################################################################################################
 
 
